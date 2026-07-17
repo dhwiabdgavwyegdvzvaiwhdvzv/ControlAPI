@@ -1,0 +1,27 @@
+name = "fpspatch-api"
+main = "src/index.js"
+compatibility_date = "2026-07-15"
+
+[assets]
+directory = "./public"
+
+[[kv_namespaces]]
+binding = "USERS_KV"
+id = "648b9a02aa814fa395913104b93d4a93"
+
+[[kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "6bf7870282a540f581e09cf09987881d"
+
+[[kv_namespaces]]
+binding = "DEVICES_KV"
+id = "c39a384d45ae4cd2901d9bc4bfb1668d"
+
+[[kv_namespaces]]
+binding = "TRIALS_KV"
+id = "1b25a657c20a4d6481ee6d8aec598e10"
+
+[vars]
+ALLOWED_ORIGIN = "http://localhost:8000,https://biguudev.store"
+SESSION_TTL_SECONDS = "2592000"
+TURNSTILE_SITE_KEY = "0x4AAAAAAD3QxkjYlZ3LFkva"

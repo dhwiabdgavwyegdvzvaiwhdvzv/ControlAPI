@@ -1,0 +1,15 @@
+{
+  "name": "fpspatch-api",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Cloudflare Worker — TikTok Encoder Studio authentication API (Phase 1: login, logout, session validation, first device lock).",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "create-user": "node scripts/create-user.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
