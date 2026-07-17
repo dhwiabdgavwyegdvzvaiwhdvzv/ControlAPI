@@ -3,11 +3,20 @@
 import { resolveSession } from './session.js';
 import { verifyTidWithProvider } from './verification.js';
 import { isKnownMethod, isPremiumMethod } from './methodPolicy.js';
-import { getDeviceLock, getTrialCredit, setTrialCredit, getTelegramLock, setTelegramLock } from './kv.js';
+import {
+  getDeviceLock, getTrialCredit, setTrialCredit, getTelegramLock, setTelegramLock,
+  getPremiumTid, setPremiumTid, getPremiumUsage, incrementPremiumUsage
+} from './kv.js';
 import { errorResponse, jsonResponse } from './errors.js';
 import { safeJson, getDeviceId, isValidDeviceId } from './util.js';
 
 const PENDING_TIMEOUT_MS = 30 * 60 * 1000;
+const PREMIUM_MONTHLY_LIMIT = 30;
+
+function nextMonthStartIso() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+}
 
 function isPendingStale(trial) {
   if (!trial || !trial.pendingSince) return false;
@@ -61,10 +70,38 @@ export async function handleMethodAuthorize(request, env) {
   if (!caller.ok) return callerErrorResponse(caller.code);
 
   if (caller.tier === 'premium') {
-    return jsonResponse({ allowed: true, usingTrial: false, tier: 'premium' }, 200);
+    const tidRecord = await getPremiumTid(env, caller.username);
+    if (!tidRecord) {
+      return errorResponse(
+        'TID_REQUIRED',
+        'Verify your Telegram ID to use premium methods.',
+        403
+      );
+    }
+
+    const used = await getPremiumUsage(env, caller.username);
+    if (used >= PREMIUM_MONTHLY_LIMIT) {
+      return errorResponse(
+        'MONTHLY_LIMIT_REACHED',
+        'You have reached your ' + PREMIUM_MONTHLY_LIMIT + ' videos/month limit. It resets on ' + nextMonthStartIso() + '.',
+        403
+      );
+    }
+
+    return jsonResponse({
+      allowed: true,
+      usingTrial: false,
+      tier: 'premium',
+      usage: {
+        used,
+        limit: PREMIUM_MONTHLY_LIMIT,
+        remaining: PREMIUM_MONTHLY_LIMIT - used,
+        resetsAt: nextMonthStartIso()
+      }
+    }, 200);
   }
 
-  
+
   const trial = await getTrialCredit(env, caller.deviceId);
 
   if (trial && trial.pendingMethod && !isPendingStale(trial)) {
@@ -117,7 +154,19 @@ export async function handleMethodComplete(request, env) {
   if (!caller.ok) return callerErrorResponse(caller.code);
 
   if (caller.tier === 'premium') {
-    return jsonResponse({ ok: true }, 200); 
+    if (outcome === 'success') {
+      const used = await incrementPremiumUsage(env, caller.username);
+      return jsonResponse({
+        ok: true,
+        usage: {
+          used,
+          limit: PREMIUM_MONTHLY_LIMIT,
+          remaining: Math.max(0, PREMIUM_MONTHLY_LIMIT - used),
+          resetsAt: nextMonthStartIso()
+        }
+      }, 200);
+    }
+    return jsonResponse({ ok: true }, 200);
   }
 
   const trial = await getTrialCredit(env, caller.deviceId);
@@ -153,10 +202,18 @@ export async function handleTidVerify(request, env) {
     return errorResponse('INVALID_TID', 'Please enter a valid Telegram ID or username.', 400);
   }
 
-  const deviceId = getDeviceId(request);
-  if (!isValidDeviceId(deviceId)) {
-    return errorResponse('VALIDATION_ERROR', 'A valid device is required.', 400);
+  const caller = await resolveCaller(request, env);
+  if (!caller.ok) return callerErrorResponse(caller.code);
+
+  if (caller.tier === 'premium') {
+    await setPremiumTid(env, caller.username, {
+      tid: verification.normalizedTid,
+      verifiedAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, tier: 'premium', tid: verification.normalizedTid }, 200);
   }
+
+  const deviceId = caller.deviceId;
 
   const existing = await getTrialCredit(env, deviceId);
   if (existing) {
@@ -204,6 +261,30 @@ export async function handleTrialStatus(request, env) {
       credits: trial ? trial.credits : 0,
       usedAt: trial ? trial.usedAt : null,
       pendingMethod: trial ? trial.pendingMethod : null
+    },
+    200
+  );
+}
+
+export async function handlePremiumUsage(request, env) {
+  const caller = await resolveCaller(request, env);
+  if (!caller.ok) return callerErrorResponse(caller.code);
+
+  if (caller.tier !== 'premium') {
+    return errorResponse('VALIDATION_ERROR', 'A premium account is required.', 400);
+  }
+
+  const tidRecord = await getPremiumTid(env, caller.username);
+  const used = await getPremiumUsage(env, caller.username);
+
+  return jsonResponse(
+    {
+      verified: !!tidRecord,
+      tid: tidRecord ? tidRecord.tid : null,
+      limit: PREMIUM_MONTHLY_LIMIT,
+      used,
+      remaining: Math.max(0, PREMIUM_MONTHLY_LIMIT - used),
+      resetsAt: nextMonthStartIso()
     },
     200
   );

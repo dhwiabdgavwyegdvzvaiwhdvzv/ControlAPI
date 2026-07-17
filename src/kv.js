@@ -111,6 +111,35 @@ export async function setTelegramLock(env, lockKey, record) {
   await env.DEVICES_KV.put('trial_tid:' + lockKey, JSON.stringify(record));
 }
 
+export async function getPremiumTid(env, username) {
+  const raw = await env.USERS_KV.get('premium_tid:' + username);
+  return safeParse(raw);
+}
+
+export async function setPremiumTid(env, username, record) {
+  await env.USERS_KV.put('premium_tid:' + username, JSON.stringify(record));
+}
+
+export function monthKey(date) {
+  const d = date || new Date();
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+}
+
+export async function getPremiumUsage(env, username) {
+  const raw = await env.USERS_KV.get('premium_usage:' + username + ':' + monthKey());
+  const rec = safeParse(raw);
+  return rec ? rec.used : 0;
+}
+
+export async function incrementPremiumUsage(env, username) {
+  const key = 'premium_usage:' + username + ':' + monthKey();
+  const raw = await env.USERS_KV.get(key);
+  const rec = safeParse(raw) || { used: 0 };
+  rec.used += 1;
+  await env.USERS_KV.put(key, JSON.stringify(rec));
+  return rec.used;
+}
+
 export async function getReview(env, id) {
   const raw = await env.USERS_KV.get('review:' + id);
   return safeParse(raw);

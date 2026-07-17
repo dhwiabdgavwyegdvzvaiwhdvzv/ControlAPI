@@ -12,7 +12,8 @@ import {
   handleMethodAuthorize,
   handleMethodComplete,
   handleTidVerify,
-  handleTrialStatus
+  handleTrialStatus,
+  handlePremiumUsage
 } from './access.js';
 import {
   handleSubmitReview,
@@ -59,6 +60,8 @@ export default {
         response = await handleTidVerify(request, env);
       } else if (request.method === 'GET' && url.pathname === '/auth/trial/status') {
         response = await handleTrialStatus(request, env);
+      } else if (request.method === 'GET' && url.pathname === '/auth/premium/usage') {
+        response = await handlePremiumUsage(request, env);
       } else if (request.method === 'POST' && url.pathname === '/reviews/submit') {
         response = await handleSubmitReview(request, env);
       } else if (request.method === 'GET' && url.pathname === '/reviews/approved') {
