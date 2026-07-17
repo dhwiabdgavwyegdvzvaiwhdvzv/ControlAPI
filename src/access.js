@@ -2,6 +2,7 @@
 
 import { resolveSession } from './session.js';
 import { verifyTidWithProvider } from './verification.js';
+import { verifyTelegramAuth } from './crypto.js';
 import { isKnownMethod, isPremiumMethod } from './methodPolicy.js';
 import {
   getDeviceLock, getTrialCredit, setTrialCredit, getTelegramLock, setTelegramLock,
@@ -193,6 +194,50 @@ export async function handleMethodComplete(request, env) {
   return jsonResponse({ ok: true, creditsRemaining: trial.credits }, 200);
 }
 
+async function applyVerifiedIdentity(env, caller, displayName, lockKey) {
+  if (caller.tier === 'premium') {
+    await setPremiumTid(env, caller.username, {
+      tid: displayName,
+      verifiedAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, tier: 'premium', tid: displayName }, 200);
+  }
+
+  const deviceId = caller.deviceId;
+
+  const existing = await getTrialCredit(env, deviceId);
+  if (existing) {
+    return jsonResponse(
+      { ok: true, alreadyVerified: true, credits: existing.credits, usedAt: existing.usedAt, tid: existing.tid || null },
+      200
+    );
+  }
+
+  const tidLock = await getTelegramLock(env, lockKey);
+  if (tidLock && tidLock.deviceId !== deviceId) {
+    return errorResponse(
+      'TID_ALREADY_USED',
+      'This Telegram ID has already claimed a trial credit on another device.',
+      403
+    );
+  }
+
+  await setTrialCredit(env, deviceId, {
+    tid: displayName,
+    credits: 1,
+    createdAt: new Date().toISOString(),
+    usedAt: null,
+    pendingMethod: null,
+    pendingSince: null
+  });
+  await setTelegramLock(env, lockKey, {
+    deviceId,
+    createdAt: new Date().toISOString()
+  });
+
+  return jsonResponse({ ok: true, alreadyVerified: false, credits: 1, tid: displayName }, 200);
+}
+
 export async function handleTidVerify(request, env) {
   const body = await safeJson(request);
   const tid = body && typeof body.tid === 'string' ? body.tid : null;
@@ -205,47 +250,25 @@ export async function handleTidVerify(request, env) {
   const caller = await resolveCaller(request, env);
   if (!caller.ok) return callerErrorResponse(caller.code);
 
-  if (caller.tier === 'premium') {
-    await setPremiumTid(env, caller.username, {
-      tid: verification.normalizedTid,
-      verifiedAt: new Date().toISOString()
-    });
-    return jsonResponse({ ok: true, tier: 'premium', tid: verification.normalizedTid }, 200);
+  return applyVerifiedIdentity(env, caller, verification.normalizedTid, verification.lockKey);
+}
+
+export async function handleTelegramAuth(request, env) {
+  const body = await safeJson(request);
+
+  const verification = await verifyTelegramAuth(body, env.TELEGRAM_BOT_TOKEN);
+  if (!verification.valid) {
+    return errorResponse('INVALID_TELEGRAM_AUTH', 'Telegram verification failed — please try again.', 400);
   }
 
-  const deviceId = caller.deviceId;
+  const caller = await resolveCaller(request, env);
+  if (!caller.ok) return callerErrorResponse(caller.code);
 
-  const existing = await getTrialCredit(env, deviceId);
-  if (existing) {
-    return jsonResponse(
-      { ok: true, alreadyVerified: true, credits: existing.credits, usedAt: existing.usedAt },
-      200
-    );
-  }
+  const displayName = verification.username
+    ? '@' + verification.username
+    : (verification.firstName + (verification.lastName ? ' ' + verification.lastName : '')).trim();
 
-  const tidLock = await getTelegramLock(env, verification.lockKey);
-  if (tidLock && tidLock.deviceId !== deviceId) {
-    return errorResponse(
-      'TID_ALREADY_USED',
-      'This Telegram ID has already claimed a trial credit on another device.',
-      403
-    );
-  }
-
-  await setTrialCredit(env, deviceId, {
-    tid: verification.normalizedTid,
-    credits: 1,
-    createdAt: new Date().toISOString(),
-    usedAt: null,
-    pendingMethod: null,
-    pendingSince: null
-  });
-  await setTelegramLock(env, verification.lockKey, {
-    deviceId,
-    createdAt: new Date().toISOString()
-  });
-
-  return jsonResponse({ ok: true, alreadyVerified: false, credits: 1 }, 200);
+  return applyVerifiedIdentity(env, caller, displayName, verification.id);
 }
 
 export async function handleTrialStatus(request, env) {
@@ -260,7 +283,8 @@ export async function handleTrialStatus(request, env) {
       verified: !!trial,
       credits: trial ? trial.credits : 0,
       usedAt: trial ? trial.usedAt : null,
-      pendingMethod: trial ? trial.pendingMethod : null
+      pendingMethod: trial ? trial.pendingMethod : null,
+      tid: trial ? trial.tid || null : null
     },
     200
   );

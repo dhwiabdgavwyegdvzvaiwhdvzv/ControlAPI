@@ -65,3 +65,57 @@ export const DUMMY_PASSWORD_HASH = {
   salt: 'LZkZjTWMT/azUWorRrGXpw==',
   hash: 'uNY3/7RJmZ+9Ppnu/9Bgy0PgBQqxGyGtdMeL8NAxNYE='
 };
+
+const TELEGRAM_AUTH_MAX_AGE_SECONDS = 86400;
+
+function toHex(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += bytes[i].toString(16).padStart(2, '0');
+  return out;
+}
+
+function timingSafeEqualHex(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Verifies a Telegram Login Widget payload per Telegram's documented algorithm:
+// https://core.telegram.org/widgets/login#checking-authorization
+export async function verifyTelegramAuth(data, botToken) {
+  if (!data || typeof data !== 'object' || !botToken) return { valid: false };
+  const { hash, ...rest } = data;
+  if (!hash || typeof hash !== 'string') return { valid: false };
+
+  const dataCheckString = Object.keys(rest)
+    .filter((k) => rest[k] !== undefined && rest[k] !== null && rest[k] !== '')
+    .sort()
+    .map((k) => k + '=' + rest[k])
+    .join('\n');
+
+  const enc = new TextEncoder();
+  const secretKeyBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(botToken)));
+  const hmacKey = await crypto.subtle.importKey('raw', secretKeyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sigBuffer = await crypto.subtle.sign('HMAC', hmacKey, enc.encode(dataCheckString));
+  const computedHex = toHex(new Uint8Array(sigBuffer));
+
+  if (!timingSafeEqualHex(computedHex, String(hash).toLowerCase())) {
+    return { valid: false, reason: 'bad_signature' };
+  }
+
+  const authDate = Number(rest.auth_date);
+  if (!authDate || (Date.now() / 1000 - authDate) > TELEGRAM_AUTH_MAX_AGE_SECONDS) {
+    return { valid: false, reason: 'expired' };
+  }
+
+  if (!rest.id) return { valid: false, reason: 'missing_id' };
+
+  return {
+    valid: true,
+    id: String(rest.id),
+    firstName: rest.first_name ? String(rest.first_name) : '',
+    lastName: rest.last_name ? String(rest.last_name) : '',
+    username: rest.username ? String(rest.username) : null
+  };
+}

@@ -12,6 +12,7 @@ import {
   handleMethodAuthorize,
   handleMethodComplete,
   handleTidVerify,
+  handleTelegramAuth,
   handleTrialStatus,
   handlePremiumUsage
 } from './access.js';
@@ -58,6 +59,8 @@ export default {
         response = await handleMethodComplete(request, env);
       } else if (request.method === 'POST' && url.pathname === '/auth/tid/verify') {
         response = await handleTidVerify(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/auth/telegram/verify') {
+        response = await handleTelegramAuth(request, env);
       } else if (request.method === 'GET' && url.pathname === '/auth/trial/status') {
         response = await handleTrialStatus(request, env);
       } else if (request.method === 'GET' && url.pathname === '/auth/premium/usage') {
