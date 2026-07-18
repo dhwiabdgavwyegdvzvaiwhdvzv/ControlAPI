@@ -30,6 +30,7 @@ import {
   handleAdminSetUserStatus,
   handleAdminResetPassword
 } from './adminUsers.js';
+import { handleGetGuideVideo, handleAdminSetGuideVideo } from './settings.js';
 import { handleOptions, withCors } from './cors.js';
 import { errorResponse } from './errors.js';
 
@@ -87,6 +88,10 @@ export default {
         response = await handleAdminSetUserStatus(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/users/reset-password') {
         response = await handleAdminResetPassword(request, env);
+      } else if (request.method === 'GET' && url.pathname === '/settings/guide-video') {
+        response = await handleGetGuideVideo(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/settings/guide-video') {
+        response = await handleAdminSetGuideVideo(request, env);
       } else if (request.method === 'GET' && url.pathname === '/health') {
         response = handleHealth();
       } else {

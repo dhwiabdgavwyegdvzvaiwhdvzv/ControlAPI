@@ -186,3 +186,12 @@ export async function incrementRenderStats(env, outcome) {
   if (outcome === 'success') stats.success += 1;
   await env.USERS_KV.put('stats:renders', JSON.stringify(stats));
 }
+
+export async function getSiteSetting(env, key) {
+  const raw = await env.USERS_KV.get('setting:' + key);
+  return safeParse(raw);
+}
+
+export async function setSiteSetting(env, key, value) {
+  await env.USERS_KV.put('setting:' + key, JSON.stringify(value));
+}
