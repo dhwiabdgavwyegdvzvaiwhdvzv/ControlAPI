@@ -136,12 +136,38 @@ th { color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: 
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.7);
   display: flex; align-items: center; justify-content: center; z-index: 999;
+  padding: 16px;
 }
 .modal-card {
   background: var(--card); border: 1px solid var(--border); border-radius: 12px;
   padding: 20px; width: 100%; max-width: 340px;
+  max-height: 86vh; overflow-y: auto;
 }
+.modal-card.wide { max-width: 520px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+
+.badge.expired { background: rgba(255,150,0,0.12); color: #ff9600; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); margin-bottom: 6px; }
+.card-value { font-size: 26px; font-weight: 800; color: var(--gold); }
+
+.dropzone {
+  border: 1.5px dashed var(--border); border-radius: 10px;
+  padding: 22px 14px; text-align: center; cursor: pointer;
+}
+.dropzone.dragover { border-color: var(--gold); background: rgba(255,208,0,0.04); }
+.dropzone-text small { display: block; color: var(--text-dim); margin-top: 4px; }
+.field-hint { font-size: 11px; color: var(--text-dim); margin: 6px 0; }
+
+.script-checklist { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.script-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.script-check input { width: auto; margin: 0; }
+
+.kr-key-hint {
+  font-size: 11px; color: var(--text-dim); word-break: break-all;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 8px; margin-top: 6px;
+}
 
 @media (max-width: 600px) {
   header, .tabs, .tab-panel { padding-left: 14px; padding-right: 14px; }

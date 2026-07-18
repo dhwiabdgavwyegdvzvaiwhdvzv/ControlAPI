@@ -127,18 +127,10 @@ $('logoutBtn').addEventListener('click', async function () {
   }
 }());
 
-document.querySelectorAll('.tab').forEach(function (tab) {
-  tab.addEventListener('click', function () {
-    document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-    tab.classList.add('active');
-    const name = tab.getAttribute('data-tab');
-    $('tabUsers').style.display = name === 'users' ? '' : 'none';
-    $('tabReviews').style.display = name === 'reviews' ? '' : 'none';
-    $('tabSettings').style.display = name === 'settings' ? '' : 'none';
-    if (name === 'reviews') loadReviews();
-    if (name === 'settings') loadGuideVideo();
-  });
-});
+// Tab click routing lives in keyreset.js now (krSetActiveTab + a single
+// unified click handler covering both these legacy tabs and the new
+// Key Reset tabs) — kept in one place to avoid two listeners fighting
+// over the same .tab buttons.
 
 function escapeHtml(s) {
   const d = document.createElement('div');
