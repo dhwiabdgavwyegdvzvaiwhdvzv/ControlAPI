@@ -1,6 +1,6 @@
 
 
-import { verifyPassword, createPasswordHash, generateSessionToken, DUMMY_PASSWORD_HASH } from './crypto.js';
+import { verifyPassword, createPasswordHash, generateSessionToken, DUMMY_PASSWORD_HASH, timingSafeEqualString } from './crypto.js';
 import { verifyTurnstileToken } from './turnstile.js';
 import { resolveSession } from './session.js';
 import {
@@ -15,11 +15,14 @@ import {
   MIN_SESSION_TTL_SECONDS,
   getDeviceLock,
   setDeviceLock,
+  clearDeviceLock,
   getDevice,
   setDevice,
   getPasswordMeta,
   setPasswordMeta,
-  appendPasswordChangeLog
+  appendPasswordChangeLog,
+  getResetAttempts,
+  bumpResetAttempts
 } from './kv.js';
 import { errorResponse, jsonResponse } from './errors.js';
 import {
@@ -291,6 +294,52 @@ export async function handleChangePassword(request, env) {
     { ok: true, changesRemaining: Math.max(0, MONTHLY_PASSWORD_CHANGE_LIMIT - newCount) },
     200
   );
+}
+
+const RESET_KEY_MAX_ATTEMPTS = 8;
+const RESET_KEY_WINDOW_SECONDS = 900;
+
+export async function handlePasswordResetWithKey(request, env) {
+  const remoteIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const attempts = await getResetAttempts(env, remoteIp);
+  if (attempts >= RESET_KEY_MAX_ATTEMPTS) {
+    return errorResponse('TOO_MANY_ATTEMPTS', 'Too many reset attempts. Try again later.', 429);
+  }
+
+  const body = await safeJson(request);
+
+  const turnstileToken = body && typeof body.turnstileToken === 'string' ? body.turnstileToken : null;
+  const turnstileResult = await verifyTurnstileToken(turnstileToken, env, remoteIp);
+  if (!turnstileResult.success) {
+    return TURNSTILE_FAILED(turnstileResult.reason);
+  }
+
+  const username = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  const resetKey = body && typeof body.resetKey === 'string' ? body.resetKey : '';
+  const newPassword = body && typeof body.newPassword === 'string' ? body.newPassword : '';
+
+  if (!username || !resetKey || !isValidNewPassword(newPassword)) {
+    return errorResponse('VALIDATION_ERROR', 'A username, reset key, and new password (8+ chars) are required.', 400);
+  }
+
+  const expectedKey = env.ADMIN_RESET_KEY || '';
+  if (!expectedKey || !timingSafeEqualString(resetKey, expectedKey)) {
+    await bumpResetAttempts(env, remoteIp, RESET_KEY_WINDOW_SECONDS);
+    return errorResponse('INVALID_RESET_KEY', 'Incorrect reset key.', 403);
+  }
+
+  const record = await getUser(env, username);
+  if (!record) {
+    await bumpResetAttempts(env, remoteIp, RESET_KEY_WINDOW_SECONDS);
+    return errorResponse('NOT_FOUND', 'No such user.', 404);
+  }
+
+  record.passwordHash = await createPasswordHash(newPassword);
+  await updateUser(env, username, record);
+  await clearDeviceLock(env, username);
+  await revokeAllUserSessions(env, username);
+
+  return jsonResponse({ ok: true }, 200);
 }
 
 export function handleHealth() {

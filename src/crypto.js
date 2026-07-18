@@ -81,6 +81,16 @@ function timingSafeEqualHex(a, b) {
   return diff === 0;
 }
 
+export function timingSafeEqualString(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const maxLen = Math.max(a.length, b.length);
+  let diff = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < maxLen; i++) {
+    diff |= (i < a.length ? a.charCodeAt(i) : 0) ^ (i < b.length ? b.charCodeAt(i) : 0);
+  }
+  return diff === 0;
+}
+
 // Verifies a Telegram Login Widget payload per Telegram's documented algorithm:
 // https://core.telegram.org/widgets/login#checking-authorization
 export async function verifyTelegramAuth(data, botToken) {

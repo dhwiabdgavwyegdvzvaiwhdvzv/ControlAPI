@@ -25,7 +25,26 @@
       </div>
       <div id="loginError" class="error-text"></div>
       <button type="submit" id="loginBtn" disabled>Login</button>
+      <button type="button" id="forgotPassBtn" class="small-btn" style="width:100%;margin-top:10px;">Forgot password?</button>
     </form>
+  </div>
+
+  <div class="login-card" id="resetKeyCard" style="display:none;">
+    <div class="login-title">Reset Password</div>
+    <input type="text" id="rkUsername" placeholder="Username" autocomplete="username">
+    <input type="text" id="rkResetKey" placeholder="Reset key">
+    <input type="password" id="rkNewPassword" placeholder="New password (min 8 chars)" autocomplete="new-password">
+    <div class="turnstile-wrap">
+      <div class="cf-turnstile"
+           id="resetTurnstile"
+           data-sitekey="0x4AAAAAAD3QxkjYlZ3LFkva"
+           data-theme="dark"
+           data-callback="onResetTurnstileSuccess"
+           data-expired-callback="onResetTurnstileExpired"></div>
+    </div>
+    <div id="resetKeyMsg" class="error-text"></div>
+    <button type="button" id="resetKeySubmitBtn" disabled>Set New Password</button>
+    <button type="button" id="resetKeyBackBtn" class="small-btn" style="width:100%;margin-top:8px;">Back to login</button>
   </div>
 </div>
 

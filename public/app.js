@@ -43,6 +43,16 @@ window.onTurnstileExpired = function () {
   $('loginBtn').disabled = true;
 };
 
+let resetTurnstileToken = null;
+window.onResetTurnstileSuccess = function (token) {
+  resetTurnstileToken = token;
+  $('resetKeySubmitBtn').disabled = false;
+};
+window.onResetTurnstileExpired = function () {
+  resetTurnstileToken = null;
+  $('resetKeySubmitBtn').disabled = true;
+};
+
 function showLogin() {
   $('loginView').style.display = '';
   $('dashView').style.display = 'none';
@@ -103,6 +113,76 @@ $('loginForm').addEventListener('submit', async function (e) {
     errEl.textContent = 'Invalid username or password.';
   }
   $('loginBtn').disabled = false;
+});
+
+$('forgotPassBtn').addEventListener('click', function () {
+  $('loginView').querySelector('.login-card').style.display = 'none';
+  $('resetKeyCard').style.display = '';
+  $('resetKeyMsg').textContent = '';
+});
+
+$('resetKeyBackBtn').addEventListener('click', function () {
+  $('resetKeyCard').style.display = 'none';
+  $('loginView').querySelector('.login-card').style.display = '';
+});
+
+$('resetKeySubmitBtn').addEventListener('click', async function () {
+  const msgEl = $('resetKeyMsg');
+  msgEl.textContent = '';
+  msgEl.style.color = '';
+
+  const username = $('rkUsername').value.trim();
+  const resetKey = $('rkResetKey').value.trim();
+  const newPassword = $('rkNewPassword').value;
+
+  if (!resetTurnstileToken) {
+    msgEl.textContent = 'Please complete the verification challenge.';
+    return;
+  }
+  if (!username || !resetKey || newPassword.length < 8) {
+    msgEl.textContent = 'Fill in username, reset key, and a new password (8+ chars).';
+    return;
+  }
+
+  $('resetKeySubmitBtn').disabled = true;
+  let result;
+  try {
+    result = await apiFetch('/auth/password/reset-with-key', {
+      method: 'POST',
+      body: JSON.stringify({ username, resetKey, newPassword, turnstileToken: resetTurnstileToken })
+    });
+  } catch (e) {
+    msgEl.textContent = 'Could not reach the server. Check your connection and try again.';
+    if (window.turnstile) turnstile.reset('#resetTurnstile');
+    resetTurnstileToken = null;
+    return;
+  }
+  if (window.turnstile) turnstile.reset('#resetTurnstile');
+  resetTurnstileToken = null;
+  $('resetKeySubmitBtn').disabled = true;
+
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.style.color = 'var(--green)';
+    msgEl.textContent = 'Password updated. You can log in now.';
+    $('rkResetKey').value = '';
+    $('rkNewPassword').value = '';
+    setTimeout(function () {
+      $('resetKeyCard').style.display = 'none';
+      $('loginView').querySelector('.login-card').style.display = '';
+      $('loginUser').value = username;
+    }, 900);
+  } else {
+    const code = result.data && result.data.error && result.data.error.code;
+    if (code === 'TOO_MANY_ATTEMPTS') {
+      msgEl.textContent = 'Too many attempts. Try again later.';
+    } else if (code === 'INVALID_RESET_KEY') {
+      msgEl.textContent = 'Incorrect reset key.';
+    } else if (code === 'NOT_FOUND') {
+      msgEl.textContent = 'No account with that username.';
+    } else {
+      msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to reset password.';
+    }
+  }
 });
 
 $('logoutBtn').addEventListener('click', async function () {

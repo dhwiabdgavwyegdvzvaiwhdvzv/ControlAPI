@@ -6,6 +6,7 @@ import {
   handleGetSession,
   handlePasswordStatus,
   handleChangePassword,
+  handlePasswordResetWithKey,
   handleHealth
 } from './handlers.js';
 import {
@@ -54,6 +55,8 @@ export default {
         response = await handlePasswordStatus(request, env);
       } else if (request.method === 'POST' && url.pathname === '/auth/password/change') {
         response = await handleChangePassword(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/auth/password/reset-with-key') {
+        response = await handlePasswordResetWithKey(request, env);
       } else if (request.method === 'POST' && url.pathname === '/auth/method/authorize') {
         response = await handleMethodAuthorize(request, env);
       } else if (request.method === 'POST' && url.pathname === '/auth/method/complete') {

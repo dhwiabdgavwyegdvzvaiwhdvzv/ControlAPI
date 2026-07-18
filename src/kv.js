@@ -84,6 +84,21 @@ export async function setDeviceLock(env, username, deviceId) {
   await env.DEVICES_KV.put('device_by_user:' + username, JSON.stringify({ deviceId }));
 }
 
+export async function clearDeviceLock(env, username) {
+  await env.DEVICES_KV.delete('device_by_user:' + username);
+}
+
+export async function getResetAttempts(env, ip) {
+  const raw = await env.USERS_KV.get('reset_attempts:' + ip);
+  return raw ? parseInt(raw, 10) || 0 : 0;
+}
+
+export async function bumpResetAttempts(env, ip, ttlSeconds) {
+  const count = await getResetAttempts(env, ip);
+  await env.USERS_KV.put('reset_attempts:' + ip, String(count + 1), { expirationTtl: ttlSeconds });
+  return count + 1;
+}
+
 export async function getDevice(env, deviceId) {
   const raw = await env.DEVICES_KV.get('device:' + deviceId);
   return safeParse(raw);
