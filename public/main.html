@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fpspatch — Admin Panel</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+
+<div id="loginView" class="view">
+  <div class="login-card">
+    <div class="login-title">Admin Login</div>
+    <form id="loginForm">
+      <input type="text" id="loginUser" placeholder="Username" autocomplete="username" required>
+      <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" required>
+      <div class="turnstile-wrap">
+        <div class="cf-turnstile"
+             id="loginTurnstile"
+             data-sitekey="0x4AAAAAAD3QxkjYlZ3LFkva"
+             data-theme="dark"
+             data-callback="onTurnstileSuccess"
+             data-expired-callback="onTurnstileExpired"></div>
+      </div>
+      <div id="loginError" class="error-text"></div>
+      <button type="submit" id="loginBtn" disabled>Login</button>
+    </form>
+  </div>
+</div>
+
+<div id="dashView" class="view" style="display:none;">
+  <header>
+    <div class="brand">fpspatch admin</div>
+    <div class="who"><span id="whoUser"></span> <button id="logoutBtn">Logout</button></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="users">Users</button>
+    <button class="tab" data-tab="reviews">Reviews</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <section id="tabUsers" class="tab-panel">
+    <div class="panel-card">
+      <div class="panel-title">Create User</div>
+      <form id="createUserForm" class="inline-form">
+        <input type="text" id="cuUsername" placeholder="Username" required>
+        <input type="password" id="cuPassword" placeholder="Password (min 8 chars)" required>
+        <select id="cuTier">
+          <option value="premium" selected>premium</option>
+          <option value="free">free</option>
+        </select>
+        <select id="cuRole">
+          <option value="user" selected>user</option>
+          <option value="admin">admin</option>
+        </select>
+        <button type="submit">Create</button>
+      </form>
+      <div id="createUserMsg" class="msg"></div>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-title">Users <button id="refreshUsersBtn" class="small-btn">Refresh</button></div>
+      <table id="usersTable">
+        <thead><tr><th>Username</th><th>Tier</th><th>Role</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody id="usersTbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tabReviews" class="tab-panel" style="display:none;">
+    <div class="panel-card">
+      <div class="panel-title">Pending Reviews <button id="refreshReviewsBtn" class="small-btn">Refresh</button></div>
+      <div id="reviewsList"></div>
+    </div>
+  </section>
+
+  <section id="tabSettings" class="tab-panel" style="display:none;">
+    <div class="panel-card">
+      <div class="panel-title">Guide Tutorial Video</div>
+      <p class="msg">Paste a Google Drive share link or a YouTube link. This updates the video shown on the "Guide" page — no code deploy needed.</p>
+      <form id="guideVideoForm" class="inline-form">
+        <input type="text" id="guideVideoUrl" placeholder="https://drive.google.com/file/d/... or https://youtu.be/...">
+        <button type="submit">Save</button>
+      </form>
+      <div id="guideVideoMsg" class="msg"></div>
+      <div id="guideVideoCurrent" class="msg"></div>
+    </div>
+  </section>
+</div>
+
+<div id="resetModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="panel-title">Reset Password</div>
+    <p id="resetUserLabel" class="msg"></p>
+    <input type="password" id="resetPassword" placeholder="New password (min 8 chars)">
+    <div id="resetMsg" class="msg"></div>
+    <div class="modal-actions">
+      <button id="resetCancelBtn" class="small-btn">Cancel</button>
+      <button id="resetConfirmBtn">Set Password</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

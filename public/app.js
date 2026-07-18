@@ -134,7 +134,9 @@ document.querySelectorAll('.tab').forEach(function (tab) {
     const name = tab.getAttribute('data-tab');
     $('tabUsers').style.display = name === 'users' ? '' : 'none';
     $('tabReviews').style.display = name === 'reviews' ? '' : 'none';
+    $('tabSettings').style.display = name === 'settings' ? '' : 'none';
     if (name === 'reviews') loadReviews();
+    if (name === 'settings') loadGuideVideo();
   });
 });
 
@@ -291,3 +293,40 @@ window.deleteReview = async function (id) {
   if (result.ok) loadReviews();
   else alert((result.data && result.data.error && result.data.error.message) || 'Failed to delete review.');
 };
+
+async function loadGuideVideo() {
+  const curEl = $('guideVideoCurrent');
+  curEl.textContent = 'Loading…';
+  const result = await apiFetch('/settings/guide-video', { method: 'GET' });
+  if (result.ok && result.data && result.data.embedUrl) {
+    curEl.textContent = 'Current: ' + result.data.embedUrl;
+    curEl.className = 'msg';
+  } else {
+    curEl.textContent = 'No video set yet.';
+    curEl.className = 'msg';
+  }
+}
+
+$('guideVideoForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const msgEl = $('guideVideoMsg');
+  msgEl.textContent = '';
+  msgEl.className = 'msg';
+
+  const url = $('guideVideoUrl').value.trim();
+  const result = await apiFetch('/admin/settings/guide-video', {
+    method: 'POST',
+    body: JSON.stringify({ url })
+  });
+
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Saved.';
+    msgEl.className = 'msg ok';
+    $('guideVideoUrl').value = '';
+    loadGuideVideo();
+  } else {
+    const message = (result.data && result.data.error && result.data.error.message) || 'Failed to save.';
+    msgEl.textContent = message;
+    msgEl.className = 'msg err';
+  }
+});
