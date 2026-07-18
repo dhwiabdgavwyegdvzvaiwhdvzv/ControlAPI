@@ -30,7 +30,12 @@ async function resolveCaller(request, env) {
   if (hasAuthHeader) {
     const resolved = await resolveSession(request, env);
     if (!resolved.ok) {
-      return { ok: false, code: resolved.reason === 'disabled' ? 'ACCOUNT_DISABLED' : 'INVALID_SESSION' };
+      const code = resolved.reason === 'disabled'
+        ? 'ACCOUNT_DISABLED'
+        : resolved.reason === 'expired'
+          ? 'ACCOUNT_EXPIRED'
+          : 'INVALID_SESSION';
+      return { ok: false, code };
     }
 
     const currentLock = await getDeviceLock(env, resolved.user.username);
@@ -49,6 +54,9 @@ async function resolveCaller(request, env) {
 function callerErrorResponse(code) {
   if (code === 'ACCOUNT_DISABLED') {
     return errorResponse('ACCOUNT_DISABLED', 'This account has been disabled. Contact support.', 403);
+  }
+  if (code === 'ACCOUNT_EXPIRED') {
+    return errorResponse('ACCOUNT_EXPIRED', 'This account has expired. Contact support to renew.', 403);
   }
   if (code === 'DEVICE_MISMATCH') {
     return errorResponse('DEVICE_MISMATCH', 'This account is locked to another device. Contact support to reset it.', 403);

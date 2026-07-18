@@ -1,7 +1,7 @@
 
 
 import { getSession, getUser } from './kv.js';
-import { getBearerToken, getDeviceId, isValidDeviceId } from './util.js';
+import { getBearerToken, getDeviceId, isValidDeviceId, isExpired } from './util.js';
 
 export async function resolveSession(request, env) {
   const token = getBearerToken(request);
@@ -17,6 +17,7 @@ export async function resolveSession(request, env) {
   const user = await getUser(env, session.username);
   if (!user) return { ok: false, reason: 'no_user' };
   if (user.status === 'disabled') return { ok: false, reason: 'disabled' };
+  if (isExpired(user.expiresAt)) return { ok: false, reason: 'expired' };
 
   return { ok: true, token, deviceId, session, user };
 }

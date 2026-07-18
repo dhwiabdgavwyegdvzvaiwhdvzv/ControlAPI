@@ -107,6 +107,8 @@ $('loginForm').addEventListener('submit', async function (e) {
     errEl.textContent = 'This account is locked to a different device/browser.';
   } else if (code === 'ACCOUNT_DISABLED') {
     errEl.textContent = 'This account has been disabled.';
+  } else if (code === 'ACCOUNT_EXPIRED') {
+    errEl.textContent = 'This account has expired.';
   } else if (code === 'TURNSTILE_FAILED') {
     errEl.textContent = (result.data.error.message) || 'Verification failed. Please try again.';
   } else {
@@ -223,32 +225,42 @@ function fmtDate(iso) {
   try { return new Date(iso).toLocaleDateString(); } catch (e) { return '—'; }
 }
 
+function fmtExpiry(dateStr) {
+  if (!dateStr) return '<span style="color:var(--text-dim);">Lifetime</span>';
+  const expired = new Date(dateStr + 'T23:59:59Z').getTime() < Date.now();
+  const label = fmtDate(dateStr);
+  return expired ? '<span style="color:var(--red);">' + label + ' (expired)</span>' : label;
+}
+
 async function loadUsers() {
   const tbody = $('usersTbody');
-  tbody.innerHTML = '<tr><td colspan="6">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7">Loading…</td></tr>';
   const result = await apiFetch('/admin/users', { method: 'GET' });
   if (!result.ok || !result.data) {
-    tbody.innerHTML = '<tr><td colspan="6">Failed to load users.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">Failed to load users.</td></tr>';
     return;
   }
   const users = result.data.users || [];
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="6">No users yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7">No users yet.</td></tr>';
     return;
   }
   tbody.innerHTML = users.map(function (u) {
     const nextStatus = u.status === 'active' ? 'disabled' : 'active';
     const toggleClass = u.status === 'active' ? 'btn-danger' : 'btn-ok';
     const toggleLabel = u.status === 'active' ? 'Disable' : 'Enable';
+    const expiryArg = u.expiresAt ? "'" + escapeHtml(u.expiresAt) + "'" : 'null';
     return '<tr>' +
       '<td>' + escapeHtml(u.username) + '</td>' +
       '<td>' + escapeHtml(u.tier) + '</td>' +
       '<td><span class="badge ' + escapeHtml(u.role) + '">' + escapeHtml(u.role) + '</span></td>' +
       '<td><span class="badge ' + escapeHtml(u.status) + '">' + escapeHtml(u.status) + '</span></td>' +
+      '<td>' + fmtExpiry(u.expiresAt) + '</td>' +
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td class="row-actions">' +
         '<button class="small-btn ' + toggleClass + '" onclick="setUserStatus(\'' + escapeHtml(u.username) + '\',\'' + nextStatus + '\')">' + toggleLabel + '</button>' +
         '<button class="small-btn" onclick="openResetModal(\'' + escapeHtml(u.username) + '\')">Reset Pass</button>' +
+        '<button class="small-btn" onclick="openExpiryModal(\'' + escapeHtml(u.username) + '\',' + expiryArg + ')">Expiry</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -266,10 +278,11 @@ $('createUserForm').addEventListener('submit', async function (e) {
   const password = $('cuPassword').value;
   const tier = $('cuTier').value;
   const role = $('cuRole').value;
+  const expiresAt = $('cuExpiry').value || null;
 
   const result = await apiFetch('/admin/users/create', {
     method: 'POST',
-    body: JSON.stringify({ username, password, tier, role })
+    body: JSON.stringify({ username, password, tier, role, expiresAt })
   });
 
   if (result.ok && result.data && result.data.ok) {
@@ -328,6 +341,50 @@ $('resetConfirmBtn').addEventListener('click', async function () {
     setTimeout(function () { $('resetModal').style.display = 'none'; }, 700);
   } else {
     msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to reset password.';
+    msgEl.className = 'msg err';
+  }
+});
+
+let expiryTargetUsername = null;
+
+window.openExpiryModal = function (username, currentExpiry) {
+  expiryTargetUsername = username;
+  $('expiryUserLabel').textContent = 'User: ' + username;
+  $('expiryDateInput').value = currentExpiry || '';
+  $('expiryNoExpiryCheck').checked = !currentExpiry;
+  $('expiryDateInput').disabled = !currentExpiry;
+  $('expiryMsg').textContent = '';
+  $('expiryModal').style.display = 'flex';
+};
+
+$('expiryNoExpiryCheck').addEventListener('change', function () {
+  $('expiryDateInput').disabled = this.checked;
+});
+
+$('expiryCancelBtn').addEventListener('click', function () {
+  $('expiryModal').style.display = 'none';
+  expiryTargetUsername = null;
+});
+
+$('expirySaveBtn').addEventListener('click', async function () {
+  const msgEl = $('expiryMsg');
+  const noExpiry = $('expiryNoExpiryCheck').checked;
+  const dateVal = $('expiryDateInput').value;
+  if (!noExpiry && !dateVal) {
+    msgEl.textContent = 'Pick a date, or check "No expiry".';
+    msgEl.className = 'msg err';
+    return;
+  }
+  const result = await apiFetch('/admin/users/expiry', {
+    method: 'POST',
+    body: JSON.stringify({ username: expiryTargetUsername, expiresAt: noExpiry ? null : dateVal })
+  });
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Saved.';
+    msgEl.className = 'msg ok';
+    setTimeout(function () { $('expiryModal').style.display = 'none'; loadUsers(); }, 500);
+  } else {
+    msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to save.';
     msgEl.className = 'msg err';
   }
 });

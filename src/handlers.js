@@ -34,7 +34,8 @@ import {
   isValidNewPassword,
   isValidDeviceId,
   normalizeUsername,
-  currentMonthKey
+  currentMonthKey,
+  isExpired
 } from './util.js';
 
 const INVALID_LOGIN = () => errorResponse('VALIDATION_ERROR', 'A valid username, password, and deviceId are required.', 400);
@@ -93,6 +94,9 @@ export async function handleLogin(request, env) {
   }
   if (user.status === 'disabled') {
     return errorResponse('ACCOUNT_DISABLED', 'This account has been disabled. Contact support.', 403);
+  }
+  if (isExpired(user.expiresAt)) {
+    return errorResponse('ACCOUNT_EXPIRED', 'This account has expired. Contact support to renew.', 403);
   }
 
   

@@ -29,6 +29,7 @@ import {
   handleAdminListUsers,
   handleAdminCreateUser,
   handleAdminSetUserStatus,
+  handleAdminSetUserExpiry,
   handleAdminResetPassword
 } from './adminUsers.js';
 import { handleGetGuideVideo, handleAdminSetGuideVideo } from './settings.js';
@@ -89,6 +90,8 @@ export default {
         response = await handleAdminCreateUser(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/users/status') {
         response = await handleAdminSetUserStatus(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/users/expiry') {
+        response = await handleAdminSetUserExpiry(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/users/reset-password') {
         response = await handleAdminResetPassword(request, env);
       } else if (request.method === 'GET' && url.pathname === '/settings/guide-video') {

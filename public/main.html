@@ -80,15 +80,17 @@
           <option value="user" selected>user</option>
           <option value="admin">admin</option>
         </select>
+        <input type="date" id="cuExpiry" title="Expiry (optional — leave blank for lifetime)">
         <button type="submit">Create</button>
       </form>
+      <div class="field-hint">Expiry is optional. Leave blank for a lifetime account.</div>
       <div id="createUserMsg" class="msg"></div>
     </div>
 
     <div class="panel-card">
       <div class="panel-title">Users <button id="refreshUsersBtn" class="small-btn">Refresh</button></div>
       <table id="usersTable">
-        <thead><tr><th>Username</th><th>Tier</th><th>Role</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <thead><tr><th>Username</th><th>Tier</th><th>Role</th><th>Status</th><th>Expiry</th><th>Created</th><th></th></tr></thead>
         <tbody id="usersTbody"></tbody>
       </table>
     </div>
@@ -131,6 +133,22 @@
     <div class="modal-actions">
       <button id="resetCancelBtn" class="small-btn">Cancel</button>
       <button id="resetConfirmBtn">Set Password</button>
+    </div>
+  </div>
+</div>
+
+<div id="expiryModal" class="modal-overlay" style="display:none;">
+  <div class="modal-card">
+    <div class="panel-title">Set Expiry</div>
+    <p id="expiryUserLabel" class="msg"></p>
+    <input type="date" id="expiryDateInput">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);margin:2px 0 10px;">
+      <input type="checkbox" id="expiryNoExpiryCheck" style="width:auto;margin:0;"> No expiry (lifetime)
+    </label>
+    <div id="expiryMsg" class="msg"></div>
+    <div class="modal-actions">
+      <button id="expiryCancelBtn" class="small-btn">Cancel</button>
+      <button id="expirySaveBtn">Save</button>
     </div>
   </div>
 </div>

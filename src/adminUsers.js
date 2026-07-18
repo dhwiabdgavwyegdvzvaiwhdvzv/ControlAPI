@@ -2,7 +2,7 @@ import { resolveAdminSession } from './session.js';
 import { getUser, updateUser, listUserRecords } from './kv.js';
 import { createPasswordHash, verifyPassword } from './crypto.js';
 import { errorResponse, jsonResponse } from './errors.js';
-import { safeJson, isValidUsername, isValidNewPassword, normalizeUsername } from './util.js';
+import { safeJson, isValidUsername, isValidNewPassword, normalizeUsername, isValidExpiryDate, isExpired } from './util.js';
 
 function adminGuardResponse(reason) {
   if (reason === 'not_admin') return errorResponse('FORBIDDEN', 'Admin access required.', 403);
@@ -16,7 +16,9 @@ function publicUserView(record) {
     role: record.role,
     status: record.status,
     telegramId: record.telegramId || null,
-    createdAt: record.createdAt || null
+    createdAt: record.createdAt || null,
+    expiresAt: record.expiresAt || null,
+    expired: isExpired(record.expiresAt)
   };
 }
 
@@ -38,10 +40,14 @@ export async function handleAdminCreateUser(request, env) {
   const password = body && typeof body.password === 'string' ? body.password : '';
   const tier = body && body.tier === 'free' ? 'free' : 'premium';
   const role = body && body.role === 'admin' ? 'admin' : 'user';
+  const rawExpiresAt = body && typeof body.expiresAt === 'string' ? body.expiresAt.trim() : '';
   const username = normalizeUsername(rawUsername);
 
   if (!isValidUsername(username) || !isValidNewPassword(password)) {
     return errorResponse('VALIDATION_ERROR', 'A valid username (3-64 chars) and password (8+ chars) are required.', 400);
+  }
+  if (rawExpiresAt && !isValidExpiryDate(rawExpiresAt)) {
+    return errorResponse('VALIDATION_ERROR', 'Expiry date must be in YYYY-MM-DD format.', 400);
   }
 
   const existing = await getUser(env, username);
@@ -57,6 +63,7 @@ export async function handleAdminCreateUser(request, env) {
     role,
     status: 'active',
     telegramId: null,
+    expiresAt: rawExpiresAt || null,
     createdAt: new Date().toISOString()
   };
   await updateUser(env, username, record);
@@ -83,6 +90,30 @@ export async function handleAdminSetUserStatus(request, env) {
   if (!record) return errorResponse('NOT_FOUND', 'No such user.', 404);
 
   record.status = status;
+  await updateUser(env, username, record);
+
+  return jsonResponse({ ok: true, user: publicUserView(record) }, 200);
+}
+
+export async function handleAdminSetUserExpiry(request, env) {
+  const admin = await resolveAdminSession(request, env);
+  if (!admin.ok) return adminGuardResponse(admin.reason);
+
+  const body = await safeJson(request);
+  const username = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  const rawExpiresAt = body && typeof body.expiresAt === 'string' ? body.expiresAt.trim() : '';
+
+  if (!username) {
+    return errorResponse('VALIDATION_ERROR', 'A username is required.', 400);
+  }
+  if (rawExpiresAt && !isValidExpiryDate(rawExpiresAt)) {
+    return errorResponse('VALIDATION_ERROR', 'Expiry date must be in YYYY-MM-DD format.', 400);
+  }
+
+  const record = await getUser(env, username);
+  if (!record) return errorResponse('NOT_FOUND', 'No such user.', 404);
+
+  record.expiresAt = rawExpiresAt || null;
   await updateUser(env, username, record);
 
   return jsonResponse({ ok: true, user: publicUserView(record) }, 200);

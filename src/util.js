@@ -48,3 +48,14 @@ export function normalizeUsername(value) {
 export function currentMonthKey() {
   return new Date().toISOString().slice(0, 7);
 }
+
+const EXPIRY_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isValidExpiryDate(value) {
+  return typeof value === 'string' && EXPIRY_DATE_PATTERN.test(value) && !isNaN(Date.parse(value));
+}
+
+export function isExpired(expiresAt) {
+  if (!expiresAt) return false;
+  return Date.now() > new Date(expiresAt + 'T23:59:59.999Z').getTime();
+}
