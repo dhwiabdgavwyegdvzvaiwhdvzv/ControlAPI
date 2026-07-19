@@ -12,7 +12,7 @@ import { errorResponse, jsonResponse } from './errors.js';
 import { safeJson, getDeviceId, isValidDeviceId } from './util.js';
 
 const PENDING_TIMEOUT_MS = 30 * 60 * 1000;
-const PREMIUM_MONTHLY_LIMIT = 30;
+export const PREMIUM_MONTHLY_LIMIT = 30;
 
 function nextMonthStartIso() {
   const now = new Date();

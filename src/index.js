@@ -30,9 +30,13 @@ import {
   handleAdminCreateUser,
   handleAdminSetUserStatus,
   handleAdminSetUserExpiry,
-  handleAdminResetPassword
+  handleAdminResetPassword,
+  handleAdminDeleteUser,
+  handleAdminSetUserRole,
+  handleAdminResetDevice,
+  handleAdminResetTid
 } from './adminUsers.js';
-import { handleGetGuideVideo, handleAdminSetGuideVideo } from './settings.js';
+import { handleGetGuideVideo, handleAdminSetGuideVideo, handleGetMethodGates, handleAdminSetMethodGates } from './settings.js';
 import { handleOptions, withCors } from './cors.js';
 import { errorResponse } from './errors.js';
 
@@ -98,10 +102,22 @@ export default {
         response = await handleAdminSetUserExpiry(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/users/reset-password') {
         response = await handleAdminResetPassword(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/users/delete') {
+        response = await handleAdminDeleteUser(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/users/role') {
+        response = await handleAdminSetUserRole(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/users/reset-device') {
+        response = await handleAdminResetDevice(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/users/reset-tid') {
+        response = await handleAdminResetTid(request, env);
       } else if (request.method === 'GET' && url.pathname === '/settings/guide-video') {
         response = await handleGetGuideVideo(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/settings/guide-video') {
         response = await handleAdminSetGuideVideo(request, env);
+      } else if (request.method === 'GET' && url.pathname === '/settings/method-gates') {
+        response = await handleGetMethodGates(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/settings/method-gates') {
+        response = await handleAdminSetMethodGates(request, env);
       } else if (request.method === 'GET' && url.pathname === '/health') {
         response = handleHealth();
       } else {

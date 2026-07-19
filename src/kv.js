@@ -18,6 +18,10 @@ export async function updateUser(env, username, record) {
   await env.USERS_KV.put('user:' + username, JSON.stringify(record));
 }
 
+export async function deleteUser(env, username) {
+  await env.USERS_KV.delete('user:' + username);
+}
+
 export async function getPasswordMeta(env, username) {
   const raw = await env.USERS_KV.get('pwmeta:' + username);
   return safeParse(raw);
@@ -133,6 +137,10 @@ export async function getPremiumTid(env, username) {
 
 export async function setPremiumTid(env, username, record) {
   await env.USERS_KV.put('premium_tid:' + username, JSON.stringify(record));
+}
+
+export async function clearPremiumTid(env, username) {
+  await env.USERS_KV.delete('premium_tid:' + username);
 }
 
 export function monthKey(date) {

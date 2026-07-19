@@ -502,6 +502,7 @@ document.querySelectorAll(".tab[data-tab]").forEach(function (tab) {
     else if (name === "settings") {
       if (typeof loadGuideVideo === "function") loadGuideVideo();
       if (typeof loadStatsOverride === "function") loadStatsOverride();
+      if (typeof loadMethodGates === "function") loadMethodGates();
     }
     else if (name === "krDashboard") loadKRDashboard();
     else if (name === "krUsers") loadKRUsers();

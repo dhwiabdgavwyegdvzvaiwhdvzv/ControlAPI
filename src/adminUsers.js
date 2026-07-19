@@ -1,8 +1,13 @@
 import { resolveAdminSession } from './session.js';
-import { getUser, updateUser, listUserRecords } from './kv.js';
+import {
+  getUser, updateUser, deleteUser, listUserRecords,
+  clearDeviceLock, clearPremiumTid, getPremiumTid, getPremiumUsage,
+  revokeAllUserSessions
+} from './kv.js';
 import { createPasswordHash, verifyPassword } from './crypto.js';
 import { errorResponse, jsonResponse } from './errors.js';
 import { safeJson, isValidUsername, isValidNewPassword, normalizeUsername, isValidExpiryDate, isExpired } from './util.js';
+import { PREMIUM_MONTHLY_LIMIT } from './access.js';
 
 function adminGuardResponse(reason) {
   if (reason === 'not_admin') return errorResponse('FORBIDDEN', 'Admin access required.', 403);
@@ -28,7 +33,25 @@ export async function handleAdminListUsers(request, env) {
 
   const records = await listUserRecords(env);
   records.sort((a, b) => (a.username > b.username ? 1 : -1));
-  return jsonResponse({ users: records.map(publicUserView) }, 200);
+
+  const users = await Promise.all(records.map(async (record) => {
+    const view = publicUserView(record);
+    if (record.tier === 'premium') {
+      const tidRecord = await getPremiumTid(env, record.username);
+      const used = await getPremiumUsage(env, record.username);
+      view.credit = {
+        tid: tidRecord ? tidRecord.tid : null,
+        used,
+        limit: PREMIUM_MONTHLY_LIMIT,
+        remaining: Math.max(0, PREMIUM_MONTHLY_LIMIT - used)
+      };
+    } else {
+      view.credit = null;
+    }
+    return view;
+  }));
+
+  return jsonResponse({ users }, 200);
 }
 
 export async function handleAdminCreateUser(request, env) {
@@ -117,6 +140,85 @@ export async function handleAdminSetUserExpiry(request, env) {
   await updateUser(env, username, record);
 
   return jsonResponse({ ok: true, user: publicUserView(record) }, 200);
+}
+
+export async function handleAdminDeleteUser(request, env) {
+  const admin = await resolveAdminSession(request, env);
+  if (!admin.ok) return adminGuardResponse(admin.reason);
+
+  const body = await safeJson(request);
+  const username = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  if (!username) return errorResponse('VALIDATION_ERROR', 'A username is required.', 400);
+  if (username === admin.user.username) {
+    return errorResponse('VALIDATION_ERROR', 'You cannot delete your own account.', 400);
+  }
+
+  const record = await getUser(env, username);
+  if (!record) return errorResponse('NOT_FOUND', 'No such user.', 404);
+
+  await revokeAllUserSessions(env, username);
+  await clearDeviceLock(env, username);
+  await clearPremiumTid(env, username);
+  await deleteUser(env, username);
+
+  return jsonResponse({ ok: true }, 200);
+}
+
+export async function handleAdminSetUserRole(request, env) {
+  const admin = await resolveAdminSession(request, env);
+  if (!admin.ok) return adminGuardResponse(admin.reason);
+
+  const body = await safeJson(request);
+  const username = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  const role = body && (body.role === 'user' || body.role === 'admin') ? body.role : null;
+
+  if (!username || !role) {
+    return errorResponse('VALIDATION_ERROR', 'A username and role ("user" or "admin") are required.', 400);
+  }
+  if (username === admin.user.username && role !== 'admin') {
+    return errorResponse('VALIDATION_ERROR', 'You cannot remove your own admin role.', 400);
+  }
+
+  const record = await getUser(env, username);
+  if (!record) return errorResponse('NOT_FOUND', 'No such user.', 404);
+
+  record.role = role;
+  await updateUser(env, username, record);
+
+  return jsonResponse({ ok: true, user: publicUserView(record) }, 200);
+}
+
+export async function handleAdminResetDevice(request, env) {
+  const admin = await resolveAdminSession(request, env);
+  if (!admin.ok) return adminGuardResponse(admin.reason);
+
+  const body = await safeJson(request);
+  const username = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  if (!username) return errorResponse('VALIDATION_ERROR', 'A username is required.', 400);
+
+  const record = await getUser(env, username);
+  if (!record) return errorResponse('NOT_FOUND', 'No such user.', 404);
+
+  await clearDeviceLock(env, username);
+  await revokeAllUserSessions(env, username);
+
+  return jsonResponse({ ok: true }, 200);
+}
+
+export async function handleAdminResetTid(request, env) {
+  const admin = await resolveAdminSession(request, env);
+  if (!admin.ok) return adminGuardResponse(admin.reason);
+
+  const body = await safeJson(request);
+  const username = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  if (!username) return errorResponse('VALIDATION_ERROR', 'A username is required.', 400);
+
+  const record = await getUser(env, username);
+  if (!record) return errorResponse('NOT_FOUND', 'No such user.', 404);
+
+  await clearPremiumTid(env, username);
+
+  return jsonResponse({ ok: true }, 200);
 }
 
 export async function handleAdminResetPassword(request, env) {

@@ -232,17 +232,25 @@ function fmtExpiry(dateStr) {
   return expired ? '<span style="color:var(--red);">' + label + ' (expired)</span>' : label;
 }
 
+function fmtCredit(u) {
+  if (!u.credit) return '<span style="color:var(--text-dim);">—</span>';
+  return u.credit.remaining + '/' + u.credit.limit;
+}
+
+let usersCache = [];
+
 async function loadUsers() {
   const tbody = $('usersTbody');
-  tbody.innerHTML = '<tr><td colspan="7">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8">Loading…</td></tr>';
   const result = await apiFetch('/admin/users', { method: 'GET' });
   if (!result.ok || !result.data) {
-    tbody.innerHTML = '<tr><td colspan="7">Failed to load users.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">Failed to load users.</td></tr>';
     return;
   }
   const users = result.data.users || [];
+  usersCache = users;
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="7">No users yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">No users yet.</td></tr>';
     return;
   }
   tbody.innerHTML = users.map(function (u) {
@@ -256,11 +264,13 @@ async function loadUsers() {
       '<td><span class="badge ' + escapeHtml(u.role) + '">' + escapeHtml(u.role) + '</span></td>' +
       '<td><span class="badge ' + escapeHtml(u.status) + '">' + escapeHtml(u.status) + '</span></td>' +
       '<td>' + fmtExpiry(u.expiresAt) + '</td>' +
+      '<td>' + fmtCredit(u) + '</td>' +
       '<td>' + fmtDate(u.createdAt) + '</td>' +
       '<td class="row-actions">' +
         '<button class="small-btn ' + toggleClass + '" onclick="setUserStatus(\'' + escapeHtml(u.username) + '\',\'' + nextStatus + '\')">' + toggleLabel + '</button>' +
         '<button class="small-btn" onclick="openResetModal(\'' + escapeHtml(u.username) + '\')">Reset Pass</button>' +
         '<button class="small-btn" onclick="openExpiryModal(\'' + escapeHtml(u.username) + '\',' + expiryArg + ')">Expiry</button>' +
+        '<button class="small-btn" onclick="openManageModal(\'' + escapeHtml(u.username) + '\')">Manage</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -389,6 +399,88 @@ $('expirySaveBtn').addEventListener('click', async function () {
   }
 });
 
+let manageTargetUsername = null;
+
+window.openManageModal = function (username) {
+  manageTargetUsername = username;
+  const u = usersCache.find(function (x) { return x.username === username; });
+  $('manageUserLabel').textContent = 'User: ' + username;
+  $('manageRoleSelect').value = (u && u.role) || 'user';
+  $('manageCreditInfo').textContent = (u && u.credit)
+    ? 'Telegram ID: ' + (u.credit.tid || 'not verified') + ' — ' + u.credit.remaining + '/' + u.credit.limit + ' videos remaining this month'
+    : 'Free tier — no premium credit tracked.';
+  $('manageMsg').textContent = '';
+  $('manageModal').style.display = 'flex';
+};
+
+$('manageCloseBtn').addEventListener('click', function () {
+  $('manageModal').style.display = 'none';
+  manageTargetUsername = null;
+});
+
+$('manageRoleSaveBtn').addEventListener('click', async function () {
+  const msgEl = $('manageMsg');
+  const result = await apiFetch('/admin/users/role', {
+    method: 'POST',
+    body: JSON.stringify({ username: manageTargetUsername, role: $('manageRoleSelect').value })
+  });
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Role updated.';
+    msgEl.className = 'msg ok';
+    loadUsers();
+  } else {
+    msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to update role.';
+    msgEl.className = 'msg err';
+  }
+});
+
+$('manageResetDeviceBtn').addEventListener('click', async function () {
+  const msgEl = $('manageMsg');
+  const result = await apiFetch('/admin/users/reset-device', {
+    method: 'POST',
+    body: JSON.stringify({ username: manageTargetUsername })
+  });
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Device ID reset. They can log in from a new device now.';
+    msgEl.className = 'msg ok';
+  } else {
+    msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to reset device.';
+    msgEl.className = 'msg err';
+  }
+});
+
+$('manageResetTidBtn').addEventListener('click', async function () {
+  const msgEl = $('manageMsg');
+  const result = await apiFetch('/admin/users/reset-tid', {
+    method: 'POST',
+    body: JSON.stringify({ username: manageTargetUsername })
+  });
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Telegram ID reset. They must verify again to use premium methods.';
+    msgEl.className = 'msg ok';
+    loadUsers();
+  } else {
+    msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to reset Telegram ID.';
+    msgEl.className = 'msg err';
+  }
+});
+
+$('manageDeleteBtn').addEventListener('click', async function () {
+  if (!confirm('Delete user "' + manageTargetUsername + '"? This cannot be undone.')) return;
+  const msgEl = $('manageMsg');
+  const result = await apiFetch('/admin/users/delete', {
+    method: 'POST',
+    body: JSON.stringify({ username: manageTargetUsername })
+  });
+  if (result.ok && result.data && result.data.ok) {
+    $('manageModal').style.display = 'none';
+    loadUsers();
+  } else {
+    msgEl.textContent = (result.data && result.data.error && result.data.error.message) || 'Failed to delete user.';
+    msgEl.className = 'msg err';
+  }
+});
+
 async function loadReviews() {
   const list = $('reviewsList');
   list.innerHTML = 'Loading…';
@@ -427,8 +519,8 @@ async function loadGuideVideo() {
   const curEl = $('guideVideoCurrent');
   curEl.textContent = 'Loading…';
   const result = await apiFetch('/settings/guide-video', { method: 'GET' });
-  if (result.ok && result.data && result.data.embedUrl) {
-    curEl.textContent = 'Current: ' + result.data.embedUrl;
+  if (result.ok && result.data && result.data.watchUrl) {
+    curEl.textContent = 'Current: ' + result.data.watchUrl + (result.data.thumbnailUrl ? ' (thumbnail set)' : ' (auto thumbnail)');
     curEl.className = 'msg';
   } else {
     curEl.textContent = 'No video set yet.';
@@ -443,16 +535,67 @@ $('guideVideoForm').addEventListener('submit', async function (e) {
   msgEl.className = 'msg';
 
   const url = $('guideVideoUrl').value.trim();
+  const thumbnailUrl = $('guideVideoThumbUrl').value.trim();
   const result = await apiFetch('/admin/settings/guide-video', {
     method: 'POST',
-    body: JSON.stringify({ url })
+    body: JSON.stringify({ url, thumbnailUrl })
   });
 
   if (result.ok && result.data && result.data.ok) {
     msgEl.textContent = 'Saved.';
     msgEl.className = 'msg ok';
     $('guideVideoUrl').value = '';
+    $('guideVideoThumbUrl').value = '';
     loadGuideVideo();
+  } else {
+    const message = (result.data && result.data.error && result.data.error.message) || 'Failed to save.';
+    msgEl.textContent = message;
+    msgEl.className = 'msg err';
+  }
+});
+
+async function loadMethodGates() {
+  const c = $('methodGatesFields');
+  c.innerHTML = 'Loading…';
+  const result = await apiFetch('/settings/method-gates', { method: 'GET' });
+  if (!result.ok || !result.data) {
+    c.innerHTML = '<div class="msg err">Failed to load.</div>';
+    return;
+  }
+  const g = result.data;
+  c.innerHTML =
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:10px;">' +
+      '<input type="checkbox" id="mg_nxtshark_enabled" style="width:auto;margin:0;" ' + (g.nxtshark && g.nxtshark.enabled ? 'checked' : '') + '> ' +
+      'NXTShark X BiguuDev Method — unlocked' +
+    '</label>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;">' +
+      '<input type="checkbox" id="mg_extension_enabled" style="width:auto;margin:0;" ' + (g.extension && g.extension.enabled ? 'checked' : '') + '> ' +
+      'Extension Method — unlocked (redirects to store link below when clicked)' +
+    '</label>' +
+    '<input type="text" id="mg_extension_store_url" placeholder="Chrome Web Store URL" value="' + escapeHtml((g.extension && g.extension.storeUrl) || '') + '">';
+}
+
+$('refreshMethodGatesBtn').addEventListener('click', loadMethodGates);
+
+$('saveMethodGatesBtn').addEventListener('click', async function () {
+  const msgEl = $('methodGatesMsg');
+  msgEl.textContent = '';
+  msgEl.className = 'msg';
+
+  const body = {
+    nxtshark: { enabled: $('mg_nxtshark_enabled').checked },
+    extension: { enabled: $('mg_extension_enabled').checked, storeUrl: $('mg_extension_store_url').value.trim() }
+  };
+
+  const result = await apiFetch('/admin/settings/method-gates', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Saved.';
+    msgEl.className = 'msg ok';
+    loadMethodGates();
   } else {
     const message = (result.data && result.data.error && result.data.error.message) || 'Failed to save.';
     msgEl.textContent = message;
