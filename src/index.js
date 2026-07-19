@@ -24,7 +24,7 @@ import {
   handleApproveReview,
   handleDeleteReview
 } from './reviews.js';
-import { handleStats, handleRenderStatsReport } from './stats.js';
+import { handleStats, handleRenderStatsReport, handleAdminGetStatsOverride, handleAdminSetStatsOverride } from './stats.js';
 import {
   handleAdminListUsers,
   handleAdminCreateUser,
@@ -84,6 +84,10 @@ export default {
         response = await handleStats(request, env);
       } else if (request.method === 'POST' && url.pathname === '/stats/render') {
         response = await handleRenderStatsReport(request, env);
+      } else if (request.method === 'GET' && url.pathname === '/admin/stats/override') {
+        response = await handleAdminGetStatsOverride(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/stats/override') {
+        response = await handleAdminSetStatsOverride(request, env);
       } else if (request.method === 'GET' && url.pathname === '/admin/users') {
         response = await handleAdminListUsers(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/users/create') {

@@ -499,7 +499,10 @@ document.querySelectorAll(".tab[data-tab]").forEach(function (tab) {
     const name = tab.getAttribute("data-tab");
     krSetActiveTab(name);
     if (name === "reviews" && typeof loadReviews === "function") loadReviews();
-    else if (name === "settings" && typeof loadGuideVideo === "function") loadGuideVideo();
+    else if (name === "settings") {
+      if (typeof loadGuideVideo === "function") loadGuideVideo();
+      if (typeof loadStatsOverride === "function") loadStatsOverride();
+    }
     else if (name === "krDashboard") loadKRDashboard();
     else if (name === "krUsers") loadKRUsers();
     else if (name === "krAdd") loadKRAddUser();

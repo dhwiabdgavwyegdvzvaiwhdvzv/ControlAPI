@@ -459,3 +459,59 @@ $('guideVideoForm').addEventListener('submit', async function (e) {
     msgEl.className = 'msg err';
   }
 });
+
+const STATS_OVERRIDE_FIELDS = [
+  { key: 'totalUsers', label: 'Users' },
+  { key: 'premiumUsers', label: 'Premium Users' },
+  { key: 'renderSuccessPct', label: 'Render Success %' },
+  { key: 'rating', label: 'Rating (0-5)' }
+];
+
+async function loadStatsOverride() {
+  const c = $('statsOverrideFields');
+  c.innerHTML = 'Loading…';
+  const result = await apiFetch('/admin/stats/override', { method: 'GET' });
+  if (!result.ok || !result.data) {
+    c.innerHTML = '<div class="msg err">Failed to load.</div>';
+    return;
+  }
+  const auto = result.data.auto || {};
+  const override = result.data.override || {};
+  c.innerHTML = STATS_OVERRIDE_FIELDS.map(function (f) {
+    const step = f.key === 'rating' ? '0.1' : '1';
+    const current = override[f.key] != null ? override[f.key] : '';
+    return '<div style="margin-bottom:10px;">' +
+      '<label class="field-hint">' + f.label + ' — auto: ' + (auto[f.key] != null ? auto[f.key] : '—') + '</label>' +
+      '<input type="number" step="' + step + '" id="stov_' + f.key + '" placeholder="Auto (blank = ' + (auto[f.key] != null ? auto[f.key] : 'auto') + ')" value="' + current + '">' +
+    '</div>';
+  }).join('');
+}
+
+$('refreshStatsOverrideBtn').addEventListener('click', loadStatsOverride);
+
+$('saveStatsOverrideBtn').addEventListener('click', async function () {
+  const msgEl = $('statsOverrideMsg');
+  msgEl.textContent = '';
+  msgEl.className = 'msg';
+
+  const body = {};
+  STATS_OVERRIDE_FIELDS.forEach(function (f) {
+    const el = $('stov_' + f.key);
+    body[f.key] = el && el.value.trim() !== '' ? el.value.trim() : null;
+  });
+
+  const result = await apiFetch('/admin/stats/override', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Saved.';
+    msgEl.className = 'msg ok';
+    loadStatsOverride();
+  } else {
+    const message = (result.data && result.data.error && result.data.error.message) || 'Failed to save.';
+    msgEl.textContent = message;
+    msgEl.className = 'msg err';
+  }
+});
