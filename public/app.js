@@ -603,6 +603,68 @@ $('saveMethodGatesBtn').addEventListener('click', async function () {
   }
 });
 
+const METHOD_LABEL_DEFAULTS = {
+  fps120: { name: 'FPS Engine', label: '120 Scale · Double Method', desc: 'Double your video duration · compatible with all users' },
+  hybrid60: { name: 'Hybrid Timestamp', label: 'Hybrid Engine V2', desc: 'Stream copy + MP4 timestamp patch · no quality loss' },
+  smart: { name: 'Timing Pass', label: 'Custom FPS Control', desc: 'Probe encoding + custom target FPS · longer or shorter' },
+  tikquick720: { name: 'TikQuick Engine', label: '720P60 Optimized', desc: 'Any resolution → optimized TikTok 720p60 output' },
+  nxtshark: { name: 'NXTShark X BiguuDev Method', label: 'Patch Your ATOM', desc: 'ATOM Patch → No VPN Anymore · 1080p60fps' },
+  extension: { name: 'Install BiguuDev Extension', label: 'Direct Upload To TikTok - No VPN Mode', desc: '' }
+};
+
+async function loadMethodLabels() {
+  const c = $('methodLabelsFields');
+  c.innerHTML = 'Loading…';
+  const result = await apiFetch('/settings/method-labels', { method: 'GET' });
+  if (!result.ok || !result.data) {
+    c.innerHTML = '<div class="msg err">Failed to load.</div>';
+    return;
+  }
+  const overrides = result.data;
+  c.innerHTML = Object.keys(METHOD_LABEL_DEFAULTS).map(function (method) {
+    const def = METHOD_LABEL_DEFAULTS[method];
+    const ov = overrides[method] || {};
+    return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);">' +
+      '<label class="field-hint" style="font-weight:700;color:var(--text);">' + escapeHtml(method) + '</label>' +
+      '<input type="text" id="ml_' + method + '_name" placeholder="Name — default: ' + escapeHtml(def.name) + '" value="' + escapeHtml(ov.name || '') + '">' +
+      '<input type="text" id="ml_' + method + '_label" placeholder="Label — default: ' + escapeHtml(def.label) + '" value="' + escapeHtml(ov.label || '') + '">' +
+      '<input type="text" id="ml_' + method + '_desc" placeholder="Description — default: ' + escapeHtml(def.desc || '(none)') + '" value="' + escapeHtml(ov.desc || '') + '">' +
+    '</div>';
+  }).join('');
+}
+
+$('refreshMethodLabelsBtn').addEventListener('click', loadMethodLabels);
+
+$('saveMethodLabelsBtn').addEventListener('click', async function () {
+  const msgEl = $('methodLabelsMsg');
+  msgEl.textContent = '';
+  msgEl.className = 'msg';
+
+  const body = {};
+  Object.keys(METHOD_LABEL_DEFAULTS).forEach(function (method) {
+    body[method] = {
+      name: $('ml_' + method + '_name').value.trim(),
+      label: $('ml_' + method + '_label').value.trim(),
+      desc: $('ml_' + method + '_desc').value.trim()
+    };
+  });
+
+  const result = await apiFetch('/admin/settings/method-labels', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
+  if (result.ok && result.data && result.data.ok) {
+    msgEl.textContent = 'Saved.';
+    msgEl.className = 'msg ok';
+    loadMethodLabels();
+  } else {
+    const message = (result.data && result.data.error && result.data.error.message) || 'Failed to save.';
+    msgEl.textContent = message;
+    msgEl.className = 'msg err';
+  }
+});
+
 const STATS_OVERRIDE_FIELDS = [
   { key: 'totalUsers', label: 'Users' },
   { key: 'premiumUsers', label: 'Premium Users' },

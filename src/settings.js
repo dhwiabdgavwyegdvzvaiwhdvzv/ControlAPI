@@ -74,6 +74,37 @@ export async function handleAdminSetGuideVideo(request, env) {
   return jsonResponse(Object.assign({ ok: true }, record), 200);
 }
 
+const METHOD_LABELS_KEY = 'method_labels';
+const KNOWN_METHODS = ['fps120', 'hybrid60', 'smart', 'tikquick720', 'nxtshark', 'extension'];
+const MAX_LABEL_LEN = 120;
+
+export async function handleGetMethodLabels(request, env) {
+  const labels = (await getSiteSetting(env, METHOD_LABELS_KEY)) || {};
+  return jsonResponse(labels, 200);
+}
+
+export async function handleAdminSetMethodLabels(request, env) {
+  const admin = await resolveAdminSession(request, env);
+  if (!admin.ok) return adminGuardResponse(admin.reason);
+
+  const body = await safeJson(request);
+  const labels = {};
+
+  for (const method of KNOWN_METHODS) {
+    const entry = body && body[method];
+    if (!entry || typeof entry !== 'object') continue;
+    const clean = {};
+    for (const field of ['name', 'label', 'desc']) {
+      const raw = typeof entry[field] === 'string' ? entry[field].trim() : '';
+      if (raw) clean[field] = raw.slice(0, MAX_LABEL_LEN);
+    }
+    if (Object.keys(clean).length) labels[method] = clean;
+  }
+
+  await setSiteSetting(env, METHOD_LABELS_KEY, labels);
+  return jsonResponse({ ok: true, labels }, 200);
+}
+
 const METHOD_GATES_KEY = 'method_gates';
 const DEFAULT_METHOD_GATES = {
   nxtshark: { enabled: false },

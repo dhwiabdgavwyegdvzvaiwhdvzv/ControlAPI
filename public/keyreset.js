@@ -503,6 +503,7 @@ document.querySelectorAll(".tab[data-tab]").forEach(function (tab) {
       if (typeof loadGuideVideo === "function") loadGuideVideo();
       if (typeof loadStatsOverride === "function") loadStatsOverride();
       if (typeof loadMethodGates === "function") loadMethodGates();
+      if (typeof loadMethodLabels === "function") loadMethodLabels();
     }
     else if (name === "krDashboard") loadKRDashboard();
     else if (name === "krUsers") loadKRUsers();

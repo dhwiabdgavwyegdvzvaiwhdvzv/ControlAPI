@@ -36,7 +36,14 @@ import {
   handleAdminResetDevice,
   handleAdminResetTid
 } from './adminUsers.js';
-import { handleGetGuideVideo, handleAdminSetGuideVideo, handleGetMethodGates, handleAdminSetMethodGates } from './settings.js';
+import {
+  handleGetGuideVideo,
+  handleAdminSetGuideVideo,
+  handleGetMethodGates,
+  handleAdminSetMethodGates,
+  handleGetMethodLabels,
+  handleAdminSetMethodLabels
+} from './settings.js';
 import { handleOptions, withCors } from './cors.js';
 import { errorResponse } from './errors.js';
 
@@ -118,6 +125,10 @@ export default {
         response = await handleGetMethodGates(request, env);
       } else if (request.method === 'POST' && url.pathname === '/admin/settings/method-gates') {
         response = await handleAdminSetMethodGates(request, env);
+      } else if (request.method === 'GET' && url.pathname === '/settings/method-labels') {
+        response = await handleGetMethodLabels(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/admin/settings/method-labels') {
+        response = await handleAdminSetMethodLabels(request, env);
       } else if (request.method === 'GET' && url.pathname === '/health') {
         response = handleHealth();
       } else {
