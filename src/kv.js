@@ -92,15 +92,23 @@ export async function clearDeviceLock(env, username) {
   await env.DEVICES_KV.delete('device_by_user:' + username);
 }
 
-export async function getResetAttempts(env, ip) {
-  const raw = await env.USERS_KV.get('reset_attempts:' + ip);
+export async function getRateLimitCount(env, bucket, key) {
+  const raw = await env.USERS_KV.get('rl:' + bucket + ':' + key);
   return raw ? parseInt(raw, 10) || 0 : 0;
 }
 
-export async function bumpResetAttempts(env, ip, ttlSeconds) {
-  const count = await getResetAttempts(env, ip);
-  await env.USERS_KV.put('reset_attempts:' + ip, String(count + 1), { expirationTtl: ttlSeconds });
+export async function bumpRateLimitCount(env, bucket, key, ttlSeconds) {
+  const count = await getRateLimitCount(env, bucket, key);
+  await env.USERS_KV.put('rl:' + bucket + ':' + key, String(count + 1), { expirationTtl: ttlSeconds });
   return count + 1;
+}
+
+export async function getResetAttempts(env, ip) {
+  return getRateLimitCount(env, 'reset', ip);
+}
+
+export async function bumpResetAttempts(env, ip, ttlSeconds) {
+  return bumpRateLimitCount(env, 'reset', ip, ttlSeconds);
 }
 
 export async function getDevice(env, deviceId) {

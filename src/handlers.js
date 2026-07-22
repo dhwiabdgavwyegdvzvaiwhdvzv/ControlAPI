@@ -22,7 +22,9 @@ import {
   setPasswordMeta,
   appendPasswordChangeLog,
   getResetAttempts,
-  bumpResetAttempts
+  bumpResetAttempts,
+  getRateLimitCount,
+  bumpRateLimitCount
 } from './kv.js';
 import { errorResponse, jsonResponse } from './errors.js';
 import {
@@ -55,12 +57,30 @@ const DEVICE_MISMATCH = () =>
   errorResponse('DEVICE_MISMATCH', 'This account is locked to another device. Contact support to reset it.', 403);
 
 const MONTHLY_PASSWORD_CHANGE_LIMIT = 3;
+const LOGIN_MAX_ATTEMPTS_IP = 15;
+const LOGIN_MAX_ATTEMPTS_USER = 8;
+const LOGIN_RATE_WINDOW_SECONDS = 900;
+const TOO_MANY_LOGIN_ATTEMPTS = () =>
+  errorResponse('TOO_MANY_ATTEMPTS', 'Too many login attempts. Please try again later.', 429);
 
 export async function handleLogin(request, env) {
   const body = await safeJson(request);
+  const remoteIp = request.headers.get('CF-Connecting-IP') || 'unknown';
+
+  const ipAttempts = await getRateLimitCount(env, 'login_ip', remoteIp);
+  if (ipAttempts >= LOGIN_MAX_ATTEMPTS_IP) {
+    return TOO_MANY_LOGIN_ATTEMPTS();
+  }
+
+  const usernameForLimit = body && typeof body.username === 'string' ? normalizeUsername(body.username) : null;
+  if (usernameForLimit) {
+    const userAttempts = await getRateLimitCount(env, 'login_user', usernameForLimit);
+    if (userAttempts >= LOGIN_MAX_ATTEMPTS_USER) {
+      return TOO_MANY_LOGIN_ATTEMPTS();
+    }
+  }
 
   const turnstileToken = body && typeof body.turnstileToken === 'string' ? body.turnstileToken : null;
-  const remoteIp = request.headers.get('CF-Connecting-IP') || undefined;
   const turnstileResult = await verifyTurnstileToken(turnstileToken, env, remoteIp);
   if (!turnstileResult.success) {
     return TURNSTILE_FAILED(turnstileResult.reason);
@@ -70,8 +90,8 @@ export async function handleLogin(request, env) {
     return INVALID_LOGIN();
   }
 
-  
-  
+
+
   const headerDeviceId = getDeviceId(request);
   if (headerDeviceId && headerDeviceId !== body.deviceId) {
     return INVALID_LOGIN();
@@ -83,13 +103,17 @@ export async function handleLogin(request, env) {
 
   const user = await getUser(env, username);
   if (!user) {
-    
-    
+
+
     await verifyPassword(password, DUMMY_PASSWORD_HASH);
+    await bumpRateLimitCount(env, 'login_ip', remoteIp, LOGIN_RATE_WINDOW_SECONDS);
+    await bumpRateLimitCount(env, 'login_user', username, LOGIN_RATE_WINDOW_SECONDS);
     return INVALID_CREDENTIALS();
   }
   const passwordOk = await verifyPassword(password, user.passwordHash);
   if (!passwordOk) {
+    await bumpRateLimitCount(env, 'login_ip', remoteIp, LOGIN_RATE_WINDOW_SECONDS);
+    await bumpRateLimitCount(env, 'login_user', username, LOGIN_RATE_WINDOW_SECONDS);
     return INVALID_CREDENTIALS();
   }
   if (user.status === 'disabled') {
