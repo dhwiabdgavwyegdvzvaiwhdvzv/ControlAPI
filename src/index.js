@@ -12,6 +12,7 @@ import {
 import {
   handleMethodAuthorize,
   handleMethodComplete,
+  handleTidVerify,
   handleTelegramAuth,
   handleTrialStatus,
   handlePremiumUsage
@@ -72,6 +73,8 @@ export default {
         response = await handleMethodAuthorize(request, env);
       } else if (request.method === 'POST' && url.pathname === '/auth/method/complete') {
         response = await handleMethodComplete(request, env);
+      } else if (request.method === 'POST' && url.pathname === '/auth/tid/verify') {
+        response = await handleTidVerify(request, env);
       } else if (request.method === 'POST' && url.pathname === '/auth/telegram/verify') {
         response = await handleTelegramAuth(request, env);
       } else if (request.method === 'GET' && url.pathname === '/auth/trial/status') {
