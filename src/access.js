@@ -1,13 +1,11 @@
 
 
 import { resolveSession } from './session.js';
-import { verifyTidWithProvider } from './verification.js';
 import { verifyTelegramAuth } from './crypto.js';
 import { isKnownMethod, isPremiumMethod } from './methodPolicy.js';
 import {
   getDeviceLock, getTrialCredit, setTrialCredit, getTelegramLock, setTelegramLock,
-  getPremiumTid, setPremiumTid, getPremiumUsage, incrementPremiumUsage,
-  getRateLimitCount, bumpRateLimitCount
+  getPremiumTid, setPremiumTid, getPremiumUsage, incrementPremiumUsage
 } from './kv.js';
 import { errorResponse, jsonResponse } from './errors.js';
 import { safeJson, getDeviceId, isValidDeviceId } from './util.js';
@@ -245,31 +243,6 @@ async function applyVerifiedIdentity(env, caller, displayName, lockKey) {
   });
 
   return jsonResponse({ ok: true, alreadyVerified: false, credits: 1, tid: displayName }, 200);
-}
-
-const TID_VERIFY_MAX_ATTEMPTS_IP = 6;
-const TID_VERIFY_RATE_WINDOW_SECONDS = 900;
-
-export async function handleTidVerify(request, env) {
-  const remoteIp = request.headers.get('CF-Connecting-IP') || 'unknown';
-  const attempts = await getRateLimitCount(env, 'tid_verify', remoteIp);
-  if (attempts >= TID_VERIFY_MAX_ATTEMPTS_IP) {
-    return errorResponse('TOO_MANY_ATTEMPTS', 'Too many attempts. Please try again later.', 429);
-  }
-  await bumpRateLimitCount(env, 'tid_verify', remoteIp, TID_VERIFY_RATE_WINDOW_SECONDS);
-
-  const body = await safeJson(request);
-  const tid = body && typeof body.tid === 'string' ? body.tid : null;
-
-  const verification = await verifyTidWithProvider(tid);
-  if (!verification.valid) {
-    return errorResponse('INVALID_TID', 'Please enter a valid Telegram ID or username.', 400);
-  }
-
-  const caller = await resolveCaller(request, env);
-  if (!caller.ok) return callerErrorResponse(caller.code);
-
-  return applyVerifiedIdentity(env, caller, verification.normalizedTid, verification.lockKey);
 }
 
 export async function handleTelegramAuth(request, env) {
